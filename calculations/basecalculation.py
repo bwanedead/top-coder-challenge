@@ -13,8 +13,9 @@ import sys
 def per_diem(days: int) -> float:
     """Per diem with adjusted rates."""
     bump = {5: 50, 6: 60, 7: 100}.get(days, 0)
+    # shave the mid-trip bump back a bit
     if days <= 7:
-        return 250 + 50 * days + bump          # unchanged short-trip rate
+        return 230 + 45 * days + bump
     return 150 + 35 * days + bump              # lower long-trip rate
 
 def mileage_rate(mpd: float) -> float:
@@ -49,9 +50,8 @@ def receipt_mult(spend: float, days: int) -> float:
     if days >= 8:
         return max(0.20, 0.5 * base_mult(spend))
 
-    # 1-3 day blow-outs: use gentler 0.40 floor instead of 0.30
-    if days <= 3 and spend > 500:
-        return 0.40
+    if days <= 3 and spend > 500:          # credit 50% of big receipts
+        return 0.50
 
     return base_mult(spend)
 
@@ -67,18 +67,18 @@ def legacy_reimbursement(days: int, miles_int: int, receipts: float,
                          miles_float_for_seed: float) -> float:
     # 1-day, R > 1500 – pay per-diem + juicy mileage + flat bonus
     if days == 1 and receipts > 1500:
+        # mileage contribution is capped at 700 mi
         core = (
             per_diem(days)
-            + 0.95 * miles_int                 # mileage premium
-            + 0.8 * min(receipts, 600)         # up to $480 extra
+            + 0.95 * min(miles_int, 700)
+            + 0.8 * min(receipts, 600)
         )
         total = core + jitter(core, days, miles_int, receipts)
         return round(total, 2)
 
     mpd = miles_int / days
     spend = receipts / days
-    # allow a bit more head-room on 2-3 day monsters
-    receipt_cap = 100 * days if days <= 3 else 150 * days
+    receipt_cap = 150 * days if days <= 3 else 150 * days
 
     total = (
         per_diem(days) +
