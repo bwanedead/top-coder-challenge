@@ -4,8 +4,8 @@ import json
 from itertools import product
 import time
 
-# Load public_cases.json
-with open('public_cases.json', 'r') as f:
+# Load public_cases.json from parent directory
+with open('../public_cases.json', 'r') as f:
     cases_data = json.load(f)
 
 # Convert JSON to DataFrame
