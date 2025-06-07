@@ -39,7 +39,7 @@ if [ ! -f "run.sh" ]; then
 fi
 
 # Make run.sh executable
-chmod +x run.sh
+# chmod +x run.sh
 
 # Check if public cases exist
 if [ ! -f "public_cases.json" ]; then

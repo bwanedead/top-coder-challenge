@@ -5,39 +5,30 @@ Reverse-engineer the legacy travel reimbursement calculation
 """
 
 import sys
+import os
+
+# Import our calculation logic
+sys.path.append(os.path.join(os.path.dirname(__file__), 'calculations'))
+from basecalculation import legacy_reimbursement
 
 def calculate_reimbursement(trip_duration_days, miles_traveled, total_receipts_amount):
     """
-    Calculate travel reimbursement based on the legacy system logic.
+    Calculate travel reimbursement using the reverse-engineered legacy system logic.
     
     Args:
         trip_duration_days (int): Number of days spent traveling
-        miles_traveled (int): Total miles traveled
+        miles_traveled (float): Total miles traveled (can be fractional)
         total_receipts_amount (float): Total dollar amount of receipts
     
     Returns:
         float: Reimbursement amount (rounded to 2 decimal places)
     """
+    days = int(trip_duration_days)
+    miles_raw = float(miles_traveled)
+    miles_int = int(miles_raw)
+    receipts = float(total_receipts_amount)
     
-    # TODO: Implement the actual logic based on your analysis of:
-    # - PRD.md (business requirements)
-    # - INTERVIEWS.md (employee hints)
-    # - public_cases.json (historical patterns)
-    
-    # Placeholder calculation - replace with actual logic
-    reimbursement = 0.0
-    
-    # Example components you might need to consider:
-    # - Base daily allowance
-    # - Mileage reimbursement
-    # - Receipt reimbursement (full or partial)
-    # - Special rules for different trip lengths
-    # - Caps or limits on certain categories
-    
-    # Simple placeholder formula (replace this!)
-    reimbursement = trip_duration_days * 50 + miles_traveled * 0.5 + total_receipts_amount
-    
-    return round(reimbursement, 2)
+    return legacy_reimbursement(days, miles_int, receipts, miles_raw)
 
 def main():
     """Main function to handle command line arguments and output result."""
@@ -46,8 +37,8 @@ def main():
         sys.exit(1)
     
     try:
-        trip_duration_days = int(sys.argv[1])
-        miles_traveled = int(sys.argv[2])
+        trip_duration_days = int(float(sys.argv[1]))
+        miles_traveled = float(sys.argv[2])
         total_receipts_amount = float(sys.argv[3])
         
         result = calculate_reimbursement(trip_duration_days, miles_traveled, total_receipts_amount)
