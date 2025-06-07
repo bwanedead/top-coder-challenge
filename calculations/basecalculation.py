@@ -11,40 +11,41 @@ import sys
 # ---------- piece-wise helpers ----------
 
 def per_diem(days: int) -> float:
-    """Per diem with lower rate for long trips."""
+    """Per diem with adjusted rates."""
     bump = {5: 50, 6: 60, 7: 100}.get(days, 0)
-    daily = 50 if days <= 7 else 40  # Reduced for long trips
-    return 200 + daily * days + bump
+    if days <= 7:
+        return 250 + 50 * days + bump  # Increased for short trips
+    return 200 + 45 * days + bump  # Adjusted for long trips
 
 def mileage_rate(mpd: float) -> float:
     """$/mile peaking at 125-175 mpd."""
     if mpd < 50:
         return 0.36
     if mpd < 100:
-        return 0.40 + 0.0006 * (mpd - 50)
+        return 0.40 + 0.0008 * (mpd - 50)
     if mpd < 125:
-        return 0.43 + 0.0010 * (mpd - 100)
+        return 0.44 + 0.0012 * (mpd - 100)
     if mpd <= 175:
-        return 0.55
+        return 0.60  # Increased peak
     if mpd <= 250:
-        return 0.45 - 0.0004 * (mpd - 175)
-    return 0.35
+        return 0.50 - 0.0004 * (mpd - 175)
+    return 0.40
 
 def receipt_mult(spend: float, days: int) -> float:
-    """Multiplier with vacation penalty and non-negative values."""
+    """Multiplier with penalties for high spending."""
     if days >= 8 and spend > 120:  # Vacation penalty
+        return 0.20
+    if days <= 3 and spend > 500:  # Short-trip high-receipt penalty
         return 0.15
-    if days <= 3 and spend > 1000/days:  # Short-trip high-receipt penalty
-        return 0.1
     if spend < 30:
         return 0.10
     if spend < 60:
-        return 0.10 + 0.0167 * (spend - 30)  # 0.10→0.60
+        return 0.10 + 0.0233 * (spend - 30)  # 0.10→0.80
     if spend < 120:
-        return 0.60 + 0.0025 * (spend - 60)  # 0.60→0.75
+        return 0.80 + 0.0017 * (spend - 60)  # 0.80→0.90
     if spend < 200:
-        return 0.75 - 0.0015 * (spend - 120)  # 0.75→0.63
-    return max(0.20, 0.63 - 0.001 * (spend - 200))  # Asymptote ~0.20
+        return 0.90 - 0.0015 * (spend - 120)  # 0.90→0.78
+    return max(0.20, 0.78 - 0.001 * (spend - 200))
 
 def jitter(core: float, days: int, miles_seed: float, receipts: float) -> float:
     """±2% deterministic jitter via LCG."""
@@ -56,17 +57,16 @@ def jitter(core: float, days: int, miles_seed: float, receipts: float) -> float:
 
 def legacy_reimbursement(days: int, miles_int: int, receipts: float,
                          miles_float_for_seed: float) -> float:
-    # 1-day mega-receipt edge-case
-    if days == 1 and receipts > 1500:
-        receipts = 0
+    # 1-day high-receipt case - revised to include mileage contribution
+    if days == 1 and receipts > 1000:
         mpd = miles_int / days
-        core = per_diem(days) + mileage_rate(mpd) * miles_int
+        core = per_diem(days) + mileage_rate(mpd) * miles_int + 0.2 * min(receipts, 100 * days)
         total = core + jitter(core, days, miles_float_for_seed, receipts)
-        return round(total * 0.5, 2)
+        return round(total, 2)
 
     mpd = miles_int / days
     spend = receipts / days
-    receipt_cap = 100 * days if days <= 3 else 150 * days  # Tighter for short trips
+    receipt_cap = 100 * days if days <= 3 else 150 * days
 
     total = (
         per_diem(days) +
