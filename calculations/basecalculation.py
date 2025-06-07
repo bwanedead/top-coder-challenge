@@ -13,10 +13,9 @@ import sys
 def per_diem(days: int) -> float:
     """Per diem with adjusted rates."""
     bump = {5: 50, 6: 60, 7: 100}.get(days, 0)
-    # shave the mid-trip bump back a bit
     if days <= 7:
-        return 230 + 45 * days + bump
-    return 150 + 35 * days + bump              # lower long-trip rate
+        return 210 + 42 * days + bump   # trims 5-/6-day by ~$110
+    return 180 + 38 * days + bump
 
 def mileage_rate(mpd: float) -> float:
     """$/mile peaking at 125-175 mpd."""
@@ -27,7 +26,7 @@ def mileage_rate(mpd: float) -> float:
     if mpd < 125:
         return 0.44 + 0.0012 * (mpd - 100)
     if mpd <= 175:
-        return 0.60  # Increased peak
+        return 0.60
     if mpd <= 250:
         return 0.50 - 0.0004 * (mpd - 175)
     return 0.40
@@ -37,22 +36,20 @@ def base_mult(spend: float) -> float:
     if spend < 30:
         return 0.10
     if spend < 60:
-        return 0.10 + 0.0233 * (spend - 30)  # 0.10→0.80
+        return 0.10 + 0.0283 * (spend - 30)  # 0.10→0.95
     if spend < 120:
-        return 0.80 + 0.0017 * (spend - 60)  # 0.80→0.90
+        return 0.95 + 0.0017 * (spend - 60)  # 0.95→1.05
     if spend < 200:
-        return 0.90 - 0.0015 * (spend - 120)  # 0.90→0.78
-    return max(0.20, 0.78 - 0.001 * (spend - 200))
+        return 1.05 - 0.0015 * (spend - 120)  # 1.05→0.93
+    return max(0.20, 0.93 - 0.001 * (spend - 200))
 
 def receipt_mult(spend: float, days: int) -> float:
     """Multiplier with penalties for high spending."""
-    # vacations: always chop in half once trip is long, regardless of spend
     if days >= 8:
-        return max(0.20, 0.5 * base_mult(spend))
-
-    if days <= 3 and spend > 500:          # credit 50% of big receipts
-        return 0.50
-
+        # keep half multiplier **but** bump per-diem baseline below
+        return max(0.25, 0.55 * base_mult(spend))
+    if days <= 3 and spend > 500:
+        return 0.65                   # credit two-thirds of huge receipts
     return base_mult(spend)
 
 def jitter(core: float, days: int, miles_seed: float, receipts: float) -> float:
@@ -65,20 +62,19 @@ def jitter(core: float, days: int, miles_seed: float, receipts: float) -> float:
 
 def legacy_reimbursement(days: int, miles_int: int, receipts: float,
                          miles_float_for_seed: float) -> float:
-    # 1-day, R > 1500 – pay per-diem + juicy mileage + flat bonus
+    # 1-day high-receipt outlier
     if days == 1 and receipts > 1500:
-        # mileage contribution is capped at 700 mi
         core = (
-            per_diem(days)
-            + 0.95 * min(miles_int, 700)
-            + 0.8 * min(receipts, 600)
+            per_diem(days) +
+            0.75 * min(miles_int, 600) +      # lower coeff & cap
+            0.60 * min(receipts, 800)         # raise receipt band, lower coeff
         )
         total = core + jitter(core, days, miles_int, receipts)
-        return round(total, 2)
+        return round(total * 0.5, 2)  # Halve output
 
     mpd = miles_int / days
     spend = receipts / days
-    receipt_cap = 150 * days if days <= 3 else 150 * days
+    receipt_cap = 100 * days if days <= 3 else 150 * days
 
     total = (
         per_diem(days) +
