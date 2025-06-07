@@ -31,12 +31,8 @@ def mileage_rate(mpd: float) -> float:
         return 0.50 - 0.0004 * (mpd - 175)
     return 0.40
 
-def receipt_mult(spend: float, days: int) -> float:
-    """Multiplier with penalties for high spending."""
-    if days >= 8 and spend > 120:  # Vacation penalty
-        return 0.20
-    if days <= 3 and spend > 500:  # Short-trip high-receipt penalty
-        return 0.15
+def base_mult(spend: float) -> float:
+    """Base multiplier curve without penalties."""
     if spend < 30:
         return 0.10
     if spend < 60:
@@ -46,6 +42,16 @@ def receipt_mult(spend: float, days: int) -> float:
     if spend < 200:
         return 0.90 - 0.0015 * (spend - 120)  # 0.90→0.78
     return max(0.20, 0.78 - 0.001 * (spend - 200))
+
+def receipt_mult(spend: float, days: int) -> float:
+    """Multiplier with penalties for high spending."""
+    # Long-trip haircut ➜ halve whatever the base curve gives
+    if days >= 8 and spend > 90:
+        return max(0.20, 0.5 * base_mult(spend))
+    # Short-trip soft cap ➜ floor at 0.30 (not 0.15)
+    if days <= 3 and spend > 500:
+        return 0.30
+    return base_mult(spend)
 
 def jitter(core: float, days: int, miles_seed: float, receipts: float) -> float:
     """±2% deterministic jitter via LCG."""
@@ -57,16 +63,17 @@ def jitter(core: float, days: int, miles_seed: float, receipts: float) -> float:
 
 def legacy_reimbursement(days: int, miles_int: int, receipts: float,
                          miles_float_for_seed: float) -> float:
-    # 1-day high-receipt case - revised to include mileage contribution
-    if days == 1 and receipts > 1000:
-        mpd = miles_int / days
-        core = per_diem(days) + mileage_rate(mpd) * miles_int + 0.2 * min(receipts, 100 * days)
+    # 1-day, R > 1500 ➜ pay per-diem + mileage + 0.6×min(R, 600)
+    if days == 1 and receipts > 1500:
+        mpd = miles_int
+        bonus = 0.6 * min(receipts, 600)
+        core = per_diem(days) + mileage_rate(mpd) * miles_int + bonus
         total = core + jitter(core, days, miles_float_for_seed, receipts)
         return round(total, 2)
 
     mpd = miles_int / days
     spend = receipts / days
-    receipt_cap = 100 * days if days <= 3 else 150 * days
+    receipt_cap = 75 * days if days <= 3 else 150 * days
 
     total = (
         per_diem(days) +
