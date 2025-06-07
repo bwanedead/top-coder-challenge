@@ -1,62 +1,25 @@
 import pandas as pd
 import numpy as np
+import json
 from itertools import product
 import time
 
-# Load public_cases.csv (first 50 rows for brevity, replace with full 614 rows)
-csv_data = """trip_duration_days,miles_traveled,total_receipts_amount,reimbursement
-3,93.0,1.42,364.51
-1,55.0,3.6,126.06
-1,47.0,17.97,128.91
-2,13.0,4.67,203.52
-3,88.0,5.78,380.37
-1,76.0,13.74,158.35
-3,41.0,4.52,320.12
-1,140.0,22.71,199.68
-3,121.0,21.17,464.07
-3,117.0,21.99,359.1
-2,202.0,21.24,356.17
-3,80.0,21.05,366.87
-2,21.0,20.04,204.58
-3,177.0,18.73,430.86
-1,141.0,10.15,195.14
-1,58.0,5.86,117.24
-1,133.0,8.34,179.06
-1,59.0,8.31,120.65
-2,89.0,13.85,234.2
-2,147.0,17.43,325.56
-5,130.0,306.9,574.1
-5,173.0,1337.9,1443.96
-5,592.0,433.75,869.0
-5,679.0,476.08,1030.41
-5,708.0,1129.52,1654.62
-5,261.0,464.94,621.12
-5,794.0,511.0,1139.94
-5,521.0,1448.55,1624.01
-5,595.0,863.93,1231.67
-5,811.0,952.39,1608.6
-5,477.0,704.42,1045.96
-5,730.0,485.73,991.49
-5,262.0,1173.79,1485.59
-5,446.0,219.98,788.62
-5,751.0,407.43,1063.46
-5,324.0,128.94,686.54
-5,414.0,967.0,1368.94
-5,367.0,290.78,742.25
-5,764.0,848.75,1468.46
-5,249.0,873.75,1185.24
-8,862.0,1817.85,1719.37
-11,927.0,1994.33,1779.12
-9,602.0,186.69,1085.4
-8,610.0,208.29,841.27
-12,333.0,1103.21,1618.13
-8,435.0,1129.65,1525.26
-9,218.0,1203.45,1561.63
-12,781.0,1159.18,1752.72
-11,916.0,1036.91,2098.07
-10,358.0,2066.62,1624.11
-"""
-df = pd.read_csv(io.StringIO(csv_data))
+# Load public_cases.json
+with open('public_cases.json', 'r') as f:
+    cases_data = json.load(f)
+
+# Convert JSON to DataFrame
+data_rows = []
+for case in cases_data:
+    data_rows.append({
+        'trip_duration_days': case['input']['trip_duration_days'],
+        'miles_traveled': case['input']['miles_traveled'],
+        'total_receipts_amount': case['input']['total_receipts_amount'],
+        'reimbursement': case['expected_output']
+    })
+
+df = pd.DataFrame(data_rows)
+print(f"Loaded {len(df)} test cases from public_cases.json")
 
 # Modified reimbursement function for tuning
 def legacy_reimbursement(days: int, miles_int: int, receipts: float,
