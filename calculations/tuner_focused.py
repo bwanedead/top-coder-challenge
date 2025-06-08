@@ -26,6 +26,7 @@ for case in cases_data:
 
 df = pd.DataFrame(data_rows)
 print(f"Loaded {len(df)} test cases from public_cases.json")
+print(f"DataFrame shape: {df.shape}")
 
 # Import our production basecalculation module
 import basecalculation as prod
@@ -118,28 +119,31 @@ combinations = list(product(
 
 print(f"Testing {len(combinations)} focused combinations...")
 
-best_mae = float('inf')
-best_params = None
-best_max_error = float('inf')
+# Fixed: Remove overly strict constraint, add fallback
+best_mae, best_max, best_params = float('inf'), float('inf'), None
 
 start_time = time.time()
 
 for idx, params in enumerate(combinations):
-    mae, max_error = score_params(params)
+    mae, mx = score_params(params)
     
-    # Prioritize MAE < 200 and max_error < 700
-    if mae < best_mae and max_error < 700:
-        best_mae = mae
-        best_params = params
-        best_max_error = max_error
-        print(f"New best: MAE={mae:.2f}, Max={max_error:.2f}")
+    # Pick the combo with lowest MAE; break ties on max error
+    if mae < best_mae or (mae == best_mae and mx < best_max):
+        best_mae, best_max, best_params = mae, mx, params
+        print(f"New best: MAE={mae:.2f}, Max={mx:.2f}")
     
-    if idx % 50 == 0:
-        print(f"Processed {idx}/{len(combinations)}")
+    if idx % 40 == 0:
+        print(f"{idx}/{len(combinations)}  MAE={mae:.2f}  MX={mx:.1f} | best MAE={best_mae:.2f}")
 
 print(f"\nFocused tuning complete in {time.time() - start_time:.2f} seconds")
+
+# Fallback check
+if best_params is None:
+    print("No combo found; something went wrong with scoring.")
+    sys.exit(1)
+
 print(f"Best MAE: {best_mae:.2f}")
-print(f"Best Max Error: {best_max_error:.2f}")
+print(f"Best Max Error: {best_max:.2f}")
 print("Best Parameters:")
 print(f"per_diem_base_short: {best_params[0]}")
 print(f"per_diem_rate_short: {best_params[1]}")
