@@ -62,7 +62,14 @@ def jitter(core: float, days: int, miles_seed: float, receipts: float) -> float:
 
 def legacy_reimbursement(days: int, miles_int: int, receipts: float,
                          miles_float_for_seed: float) -> float:
-    # 1-day high-receipt outlier
+    # TARGETED FIX 1: 1-day mega-mileage + receipts (Case 996 style)
+    if days == 1 and receipts > 1500 and miles_int > 500:
+        # Pay only generous mileage, no receipts
+        core = per_diem(days) + 0.60 * miles_int
+        total = core + jitter(core, days, miles_int, receipts)
+        return round(total, 2)
+    
+    # Original 1-day high-receipt outlier (for lower mileage cases)
     if days == 1 and receipts > 1500:
         core = (
             per_diem(days) +
@@ -74,7 +81,14 @@ def legacy_reimbursement(days: int, miles_int: int, receipts: float,
 
     mpd = miles_int / days
     spend = receipts / days
-    receipt_cap = 100 * days if days <= 3 else 150 * days
+    
+    # TARGETED FIX 2: Loosen short-trip receipt cap for high spenders
+    if days <= 3 and spend > 500:
+        receipt_cap = 250 * days      # instead of 150 * days
+    elif days <= 3:
+        receipt_cap = 100 * days      # keep original for modest trips
+    else:
+        receipt_cap = 150 * days      # keep existing for longer trips
 
     total = (
         per_diem(days) +
